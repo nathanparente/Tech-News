@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Variáveis locais e credenciais
+.env
+.env.*
+!.env.example
+
+# Certificados e chaves locais
+*.pem
+*.key
+*.p12
+*.pfx

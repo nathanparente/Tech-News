@@ -7,34 +7,65 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "./styles.css";
 
-type Category = "newstories" | "beststories";
+type Category = "latest" | "headlines";
 
 type News = {
-  id: number;
+  id: string;
   title: string;
   subtitle: string | null;
   date: string;
   keywords: string[];
   paragraphs: [string | null, string | null, string | null];
   sourceUrl: string;
-  hnUrl: string;
+  sourceName: string;
+  imageUrl: string | null;
   hasSourceText: boolean;
 };
 
 const categories: Record<Category, string> = {
-  newstories: "Notícias Recentes",
-  beststories: "Melhores Notícias",
+  latest: "Últimas de tecnologia",
+  headlines: "Destaques de tecnologia",
 };
 
 const categoryDescriptions: Record<Category, string> = {
-  newstories: "Acompanhe as publicações mais recentes da comunidade.",
-  beststories: "Explore a seleção de melhores publicações do Hacker News.",
+  latest:
+    "Notícias sobre tecnologia, ordenadas da mais recente para a mais antiga.",
+  headlines:
+    "Manchetes da categoria de tecnologia selecionadas pela GNews.",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "long",
   timeStyle: "short",
 });
+
+function NewsImage({
+  src,
+}: {
+  src: string | null;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  return (
+    <div className="news-card__media" aria-hidden="true">
+      {src && !failed && (
+        <img
+          className="news-card__image"
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [category, setCategory] = useState<Category | null>(null);
@@ -143,7 +174,7 @@ export default function App() {
               <h2 id="loading-title">Preparando suas notícias</h2>
 
               <p role="status">
-                Consultando o Hacker News e processando os textos com llama3.1.
+                Consultando a GNews e processando os textos com llama3.1.
                 Isso pode levar alguns minutos.
               </p>
             </section>
@@ -196,7 +227,7 @@ export default function App() {
                       <div className="news-card__content">
                         <header className="news-card__header">
                           <p className="news-date">
-                            Publicada no Hacker News em{" "}
+                            {article.sourceName} · Publicada em{" "}
                             <time dateTime={article.date}>
                               {dateFormatter.format(new Date(article.date))}
                             </time>
@@ -238,7 +269,7 @@ export default function App() {
 
                         {!article.hasSourceText && (
                           <p className="notice">
-                            A API disponibilizou apenas o título e o link.
+                            A GNews disponibilizou apenas o título e os dados da publicação.
                             Não foi gerado um resumo da matéria completa.
                           </p>
                         )}
@@ -259,30 +290,14 @@ export default function App() {
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              Ler publicação <span aria-hidden="true">↗</span>
-                            </a>
-
-                            <a
-                              className="text-link"
-                              href={article.hnUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Discussão no Hacker News
+                              Ler publicação original
+                              <span aria-hidden="true"> ↗</span>
                             </a>
                           </div>
-
-                          <p className="disclaimer">
-                            Texto processado localmente por IA. Confira a fonte
-                            original.
-                          </p>
                         </footer>
                       </div>
 
-                      <div
-                        className="news-card__media"
-                        aria-hidden="true"
-                      />
+                      <NewsImage src={article.imageUrl} />
                     </article>
                   </SwiperSlide>
                 ))}
@@ -358,7 +373,7 @@ export default function App() {
                   value={count}
                   onChange={(event) => setCount(Number(event.target.value))}
                 >
-                  {[1, 5, 10, 15, 20].map((value) => (
+                  {[1, 5, 10].map((value) => (
                     <option key={value} value={value}>
                       {value} {value === 1 ? "notícia" : "notícias"}
                     </option>
