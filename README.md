@@ -1,5 +1,7 @@
 # Tech News — GNews + Ollama
 
+![Tela inicial do Tech News com seleção de categoria e quantidade de notícias](./public/screenshots/homepage.png)
+
 Aplicação local para consultar notícias de tecnologia pela **GNews API** e gerar resumos em português com o modelo **Llama 3.1**, executado pelo **Ollama**.
 
 A interface utiliza React, TypeScript e um carrossel manual com Swiper.js.
