@@ -316,9 +316,21 @@ Retorne:
 - subtitle: subtítulo fundamentado no material recebido, ou null.
 - keywords: até quatro palavras-chave.
 - paragraphs: exatamente três posições:
-  1. contexto inicial;
-  2. complemento do contexto inicial;
-  3. ponto principal da notícia.
+  1. contexto inicial: apresente o assunto de forma objetiva;
+  2. complemento: produza o parágrafo mais desenvolvido do resumo,
+     preferencialmente com três a cinco frases, explicando detalhes,
+     causas, consequências ou aplicações explicitamente presentes
+     no material recebido;
+  3. ponto principal: destaque a informação central de forma concisa.
+
+O segundo parágrafo deve ser mais detalhado que o primeiro apenas
+quando houver material suficiente.
+
+Não use conhecimento externo, não invente detalhes e não repita
+informações apenas para aumentar o tamanho do texto.
+
+Quando não houver informação suficiente, escreva um parágrafo
+mais curto ou use null na posição correspondente.
 
 Cada parágrafo deve trazer informação fundamentada no material recebido.
 Não repita informações apenas para preencher o formato.
@@ -502,7 +514,7 @@ app.get("/api/news", async (req, res) => {
         .update(JSON.stringify({ title, description, content }))
         .digest("hex");
 
-      const summaryKey = `summary:v1:${MODEL}:${id}:${revision}`;
+      const summaryKey = `summary:v2:${MODEL}:${id}:${revision}`;
       let summary = getCached<Summary>(summaryKey);
 
       if (!summary) {

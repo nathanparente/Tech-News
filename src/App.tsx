@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useId } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { A11y, Keyboard, Navigation, Pagination } from "swiper/modules";
 
@@ -39,16 +39,8 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   timeStyle: "short",
 });
 
-function NewsImage({
-  src,
-}: {
-  src: string | null;
-}) {
+function NewsImage({ src }: { src: string | null }) {
   const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [src]);
 
   return (
     <div className="news-card__media" aria-hidden="true">
@@ -62,6 +54,182 @@ function NewsImage({
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
         />
+      )}
+    </div>
+  );
+}
+
+const quantityOptions = [1, 5, 10];
+
+type QuantitySelectProps = {
+  value: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+};
+
+function QuantitySelect({
+  value,
+  onChange,
+  disabled = false,
+}: QuantitySelectProps) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const selectedIndex = Math.max(0, quantityOptions.indexOf(value));
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      optionRefs.current[selectedIndex]?.focus();
+    }
+  }, [open, selectedIndex]);
+
+  function closeAndFocus() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function selectOption(option: number) {
+    onChange(option);
+    closeAndFocus();
+  }
+
+  return (
+    <div
+      className="custom-select"
+      ref={rootRef}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <span id={`${id}-label`} className="custom-select__label">
+        Quantidade de notícias
+      </span>
+
+      <button
+        ref={triggerRef}
+        id={`${id}-trigger`}
+        type="button"
+        className="custom-select__trigger"
+        disabled={disabled}
+        aria-labelledby={`${id}-label ${id}-value`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? `${id}-listbox` : undefined}
+        onClick={() => setOpen((previous) => !previous)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+          }
+
+          if (event.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      >
+        <span id={`${id}-value`}>
+          {value} {value === 1 ? "notícia" : "notícias"}
+        </span>
+
+        <span
+          className={`custom-select__chevron ${open ? "is-open" : ""}`}
+          aria-hidden="true"
+        >
+          ▾
+        </span>
+      </button>
+
+      {open && (
+        <div
+          id={`${id}-listbox`}
+          className="custom-select__dropdown"
+          role="listbox"
+          aria-labelledby={`${id}-label`}
+        >
+          {quantityOptions.map((option, index) => (
+            <button
+              key={option}
+              ref={(element) => {
+                optionRefs.current[index] = element;
+              }}
+              type="button"
+              role="option"
+              aria-selected={value === option}
+              tabIndex={-1}
+              className="custom-select__option"
+              onClick={() => selectOption(option)}
+              onKeyDown={(event) => {
+                let targetIndex: number | undefined;
+
+                switch (event.key) {
+                  case "ArrowDown":
+                    targetIndex = (index + 1) % quantityOptions.length;
+                    break;
+
+                  case "ArrowUp":
+                    targetIndex =
+                      (index - 1 + quantityOptions.length) %
+                      quantityOptions.length;
+                    break;
+
+                  case "Home":
+                    targetIndex = 0;
+                    break;
+
+                  case "End":
+                    targetIndex = quantityOptions.length - 1;
+                    break;
+
+                  case "Escape":
+                    event.preventDefault();
+                    closeAndFocus();
+                    return;
+
+                  case "Tab":
+                    // Retorna ao botão antes da navegação padrão por Tab.
+                    setOpen(false);
+                    triggerRef.current?.focus();
+                    return;
+                }
+
+                if (targetIndex !== undefined) {
+                  event.preventDefault();
+                  optionRefs.current[targetIndex]?.focus();
+                }
+              }}
+            >
+              <span>
+                {option} {option === 1 ? "notícia" : "notícias"}
+              </span>
+
+              {value === option && <span aria-hidden="true">✓</span>}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -138,25 +306,22 @@ export default function App() {
     return (
       <main className="app-shell">
         <div className="content-shell">
-          <header className="page-header">
-            <button
-              type="button"
-              className="button button--ghost"
-              disabled={loading}
-              onClick={() => setScreen("settings")}
-            >
-              <span aria-hidden="true">←</span> Voltar às opções
-            </button>
-
-            <h1 ref={headingRef} tabIndex={-1}>
-              {categories[category]}
-            </h1>
-
-            {!loading && !error && news.length > 0 && (
-              <p className="page-description">
-                {news.length} notícias. Explore no seu ritmo, sem reprodução automática.
-              </p>
+          <header className="page-header news-page-header">
+            {!loading && (
+              <button
+                type="button"
+                className="back-arrow"
+                onClick={() => setScreen("settings")}
+                aria-label="Voltar às opções"
+                title="Voltar às opções"
+              >
+                <span aria-hidden="true">←</span>
+              </button>
             )}
+
+            <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+              Notícias de tecnologia
+            </h1>
 
             {!loading && !error && news.length > 0 && news.length < count && (
               <p className="notice" role="status">
@@ -167,14 +332,17 @@ export default function App() {
 
           {loading && (
             <section
-              className="feedback-panel"
+              className="feedback-panel loading-panel"
               aria-labelledby="loading-title"
               aria-busy="true"
             >
+              <span className="loading-spinner" aria-hidden="true" />
+
               <h2 id="loading-title">Preparando suas notícias</h2>
 
               <p role="status">
                 Consultando a GNews e processando os textos com llama3.1.
+                <br />
                 Isso pode levar alguns minutos.
               </p>
             </section>
@@ -260,10 +428,9 @@ export default function App() {
                           )}
 
                           {article.paragraphs[2] && (
-                            <section className="main-point">
-                              <h3>Ponto principal</h3>
+                            <div className="main-point">
                               <p>{article.paragraphs[2]}</p>
-                            </section>
+                            </div>
                           )}
                         </div>
 
@@ -297,7 +464,10 @@ export default function App() {
                         </footer>
                       </div>
 
-                      <NewsImage src={article.imageUrl} />
+                      <NewsImage
+                        key={article.imageUrl ?? "no-image"}
+                        src={article.imageUrl}
+                      />
                     </article>
                   </SwiperSlide>
                 ))}
@@ -314,8 +484,9 @@ export default function App() {
       <div className="content-shell settings-shell">
        <header className="page-header">
         <h1 ref={headingRef} tabIndex={-1}>
-          Escolha suas notícias
+          Tech News - Acompanhe notícias do mundo da tecnologia
         </h1>
+        <p>Integrado com a API GNews para exibir notícias atualizadas</p>
       </header>
 
         <form
@@ -327,8 +498,6 @@ export default function App() {
           aria-busy={loading}
         >
           <fieldset className="form-fieldset" disabled={loading}>
-            <legend>01 — Escolha uma categoria</legend>
-
             <div className="category-grid">
               {(Object.entries(categories) as [Category, string][]).map(
                 ([value, label]) => (
@@ -363,23 +532,13 @@ export default function App() {
 
           {category && (
             <fieldset className="form-fieldset" disabled={loading}>
-              <legend>02 — Quantas notícias você quer ver?</legend>
+              <legend className="sr-only">Quantidade de notícias</legend>
 
-              <div className="quantity-control">
-                <label htmlFor="count">Quantidade de notícias</label>
-
-                <select
-                  id="count"
-                  value={count}
-                  onChange={(event) => setCount(Number(event.target.value))}
-                >
-                  {[1, 5, 10].map((value) => (
-                    <option key={value} value={value}>
-                      {value} {value === 1 ? "notícia" : "notícias"}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <QuantitySelect
+                value={count}
+                onChange={setCount}
+                disabled={loading}
+              />
             </fieldset>
           )}
 
