@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useId } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { A11y, Keyboard, Navigation, Pagination } from "swiper/modules";
+import ExportNewsButton from "./components/ExportNewsButton";
 
 import "swiper/css";
 import "swiper/css/navigation";
@@ -308,15 +309,21 @@ export default function App() {
         <div className="content-shell">
           <header className="page-header news-page-header">
             {!loading && (
-              <button
-                type="button"
-                className="back-arrow"
-                onClick={() => setScreen("settings")}
-                aria-label="Voltar às opções"
-                title="Voltar às opções"
-              >
-                <span aria-hidden="true">←</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="back-arrow"
+                  onClick={() => setScreen("settings")}
+                  aria-label="Voltar às opções"
+                  title="Voltar às opções"
+                >
+                  <span aria-hidden="true">←</span>
+                </button>
+
+                {!error && news.length > 0 && (
+                  <ExportNewsButton news={news} />
+                )}
+              </>
             )}
 
             <h1 ref={headingRef} tabIndex={-1} className="sr-only">

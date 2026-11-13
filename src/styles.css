@@ -117,9 +117,8 @@ p {
 }
 
 .page-header {
-  display: grid;
-  justify-items: start;
-  gap: 16px;
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 32px;
 }
 
@@ -736,4 +735,15 @@ p {
   .loading-spinner {
     animation: none;
   }
+}
+
+.pdf-export {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.pdf-export__status {
+  font-size: 14px;
+  line-height: 1.5;
 }
