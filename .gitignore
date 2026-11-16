@@ -28,6 +28,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Cache local de resumos
+data/
+
 # Certificados e chaves locais
 *.pem
 *.key

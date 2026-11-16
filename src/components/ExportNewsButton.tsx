@@ -9,19 +9,9 @@ import {
   View,
   pdf,
 } from "@react-pdf/renderer";
+import type { News } from "../../shared/types.ts";
 
-export type ExportableNews = {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  date: string;
-  keywords: string[];
-  paragraphs: [string | null, string | null, string | null];
-  sourceUrl: string;
-  sourceName: string;
-  imageUrl: string | null;
-  hasSourceText: boolean;
-};
+export type ExportableNews = News;
 
 type PreparedNews = ExportableNews & {
   pdfImage: string | null;
@@ -173,36 +163,27 @@ function bodyFontSize(article: ExportableNews): number {
 }
 
 /**
- * Busca somente a imagem já informada pela API.
+ * Busca somente a imagem já informada pela API, pelo proxy local.
  * Não consulta a GNews e não acessa o corpo da matéria.
  *
- * Se CORS, formato ou disponibilidade impedirem o download,
- * a página será exportada com placeholder.
+ * URL ausente não é falha. Falha do proxy volta como null para o PDF
+ * seguir sem essa imagem e o aviso contar a omissão.
  */
 async function prepareImage(url: string | null): Promise<string | null> {
   if (!url) return null;
 
   try {
-    const parsed = new URL(url);
+    const params = new URLSearchParams({ url });
+    const response = await fetch(`/api/image-proxy?${params}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    const contentType = response.headers.get("content-type") ?? "";
 
-    if (!["http:", "https:"].includes(parsed.protocol)) {
+    if (!response.ok || !contentType.includes("image/jpeg")) {
       return null;
     }
-
-    const response = await fetch(parsed.href, {
-      signal: AbortSignal.timeout(10_000),
-      credentials: "omit",
-      referrerPolicy: "no-referrer",
-    });
-
-    if (!response.ok) return null;
 
     const blob = await response.blob();
-
-    // PNG e JPEG são aceitos diretamente pelo renderizador.
-    if (!["image/png", "image/jpeg"].includes(blob.type)) {
-      return null;
-    }
 
     if (blob.size > 5 * 1024 * 1024) {
       return null;
@@ -344,12 +325,19 @@ export default function ExportNewsButton({
 
     try {
       const prepared: PreparedNews[] = [];
+      let missingImages = 0;
 
       // Sequencial para evitar vários downloads simultâneos.
       for (const article of news) {
+        const pdfImage = await prepareImage(article.imageUrl);
+
+        if (article.imageUrl && !pdfImage) {
+          missingImages += 1;
+        }
+
         prepared.push({
           ...article,
-          pdfImage: await prepareImage(article.imageUrl),
+          pdfImage,
         });
       }
 
@@ -372,6 +360,14 @@ export default function ExportNewsButton({
       window.setTimeout(() => {
         URL.revokeObjectURL(objectUrl);
       }, 60_000);
+
+      if (missingImages > 0) {
+        setError(
+          missingImages === 1
+            ? "O PDF foi gerado, mas 1 imagem não pôde ser incluída."
+            : `O PDF foi gerado, mas ${missingImages} imagens não puderam ser incluídas.`,
+        );
+      }
     } catch {
       setError(
         "Não foi possível gerar o PDF. Tente novamente.",

@@ -52,6 +52,8 @@ Backend local — Express
 
 A chave da GNews fica exclusivamente no backend. O navegador não consulta diretamente a API de notícias.
 
+`GET /api/news` responde com Server-Sent Events. Cada resumo é enviado assim que fica pronto (`event: item`). Uma falha isolada chega como `event: item-error` e não descarta os resumos anteriores. Fechar a página ou voltar às opções encerra a conexão e aborta a chamada em andamento ao Ollama.
+
 ## Pré-requisitos
 
 - Node.js 22 LTS ou outra versão suportada e compatível com o projeto.
@@ -156,6 +158,9 @@ npm run build
 
 # Visualiza o build do frontend
 npm run preview
+
+# Executa os testes unitários (Vitest, sem acesso à rede)
+npm test
 ```
 
 O comando `preview` não inicia o backend. Para utilizar a aplicação nesse modo, também é necessário configurar o acesso às rotas do backend; o proxy de desenvolvimento do Vite não faz parte do build.
@@ -165,7 +170,7 @@ O comando `preview` não inicia o backend. Para utilizar a aplicação nesse mod
 1. Selecione **Últimas de tecnologia** ou **Destaques de tecnologia**.
 2. Escolha a quantidade de notícias.
 3. Clique em **Explorar notícias**.
-4. Aguarde a consulta e o processamento local.
+4. Os cards aparecem conforme cada resumo fica pronto. Voltar às opções cancela a geração em andamento.
 5. Navegue pelo carrossel usando setas, indicadores, teclado ou gesto de deslizar.
 6. Utilize o link da publicação para conferir a fonte original.
 
@@ -239,13 +244,15 @@ A aplicação utiliza:
 | Recurso | Configuração |
 |---|---|
 | Notícias por seleção | Até 10 |
-| Cache das consultas e listas finais | 5 minutos |
-| Cache dos resumos | 30 minutos |
+| Cache das consultas à GNews e das listas completas | 5 minutos, em memória |
+| Cache dos resumos | 30 minutos, em disco (`data/summaries.json`) |
 | Processamento | Uma geração em andamento por vez |
 | Limite local de requisições | 30 por minuto |
 | Proteções adicionais | Timeouts e validação de respostas |
 
-O cache fica em memória e desaparece ao reiniciar o backend, inclusive nos reinícios automáticos durante o desenvolvimento.
+A lista em memória desaparece ao reiniciar o backend. Os resumos em disco permanecem até expirar. A chave de cada resumo inclui o modelo, o hash do prompt e o hash do texto recebido: mudar as instruções do modelo faz o resumo ser gerado de novo.
+
+A lista completa só é reaproveitada quando todos os resumos da seleção foram gerados. Voltar durante a geração fecha a conexão. O backend aborta a chamada em andamento ao Ollama e só então aceita a próxima.
 
 O limite local de requisições não substitui nem representa a cota da GNews.
 
@@ -279,12 +286,13 @@ O modelo é instruído a tratar esse material como dados e não recebe ferrament
 
 ### Imagens externas
 
-As imagens são carregadas diretamente pelo navegador, quando disponíveis.
+No carrossel, as imagens são carregadas diretamente pelo navegador, quando disponíveis.
 
 - Imagens ausentes ou com falha são substituídas pelo placeholder.
-- O backend não baixa as imagens.
-- A política `no-referrer` evita enviar o referenciador.
-- O servidor da imagem ainda pode receber o IP do usuário e os dados normais da conexão.
+- A exportação em PDF pede cada imagem a `GET /api/image-proxy`. O backend só busca URLs HTTP ou HTTPS públicas, recusa endereços locais e devolve JPEG.
+- Se alguma imagem não puder entrar no PDF, a exportação continua e o aviso informa quantas ficaram de fora.
+- A política `no-referrer` evita enviar o referenciador no carrossel.
+- O servidor da imagem pode receber o IP do usuário no carrossel, ou o IP desta máquina quando o PDF é gerado.
 
 ### Serviços locais
 
@@ -330,6 +338,8 @@ Verifique a validade da chave, a cota e as permissões do plano no dashboard da 
 
 ### O resumo não foi gerado
 
+A tela inicial consulta `GET /api/health`. O backend pergunta a `/api/tags` do Ollama se o serviço está no ar e se o modelo configurado está baixado.
+
 Verifique:
 
 ```bash
@@ -344,7 +354,7 @@ O conteúdo fornecido pela API pode ser insuficiente. A aplicação permite camp
 
 ### A imagem não aparece
 
-A URL pode estar indisponível ou o servidor de origem pode bloquear o carregamento. Nesse caso, a aplicação mantém o placeholder.
+A URL pode estar indisponível ou o servidor de origem pode bloquear o carregamento. No carrossel, a aplicação mantém o placeholder. No PDF, a exportação segue e informa quantas imagens ficaram de fora.
 
 ## Estrutura principal
 
@@ -353,16 +363,39 @@ A URL pode estar indisponível ou o servidor de origem pode bloquear o carregame
 ├── docs/
 │   └── gnews-api.md
 ├── server/
-│   └── index.ts
+│   ├── index.ts            # Express, rotas e trava de geração
+│   ├── config.ts           # Variáveis de ambiente
+│   ├── schemas.ts          # Schemas Zod
+│   ├── summary-cache.ts    # Cache de resumos em disco
+│   ├── lib/
+│   │   ├── errors.ts
+│   │   ├── http.ts
+│   │   ├── memory-cache.ts
+│   │   ├── security.ts
+│   │   └── sse.ts
+│   └── services/
+│       ├── gnews.ts
+│       ├── image-proxy.ts
+│       └── ollama.ts
+├── shared/
+│   └── types.ts            # Tipos usados pelo backend e pelo frontend
 ├── src/
 │   ├── App.tsx
 │   ├── main.tsx
-│   └── styles.css
+│   ├── parseSse.ts
+│   ├── styles.css
+│   └── components/
+│       ├── ExportNewsButton.tsx
+│       ├── NewsCarousel.tsx
+│       └── QueryForm.tsx
 ├── .env.example
 ├── .gitignore
 ├── package.json
-└── vite.config.ts
+├── vite.config.ts
+└── vitest.config.ts
 ```
+
+Os testes ficam ao lado do código, em `server/**/*.test.ts`.
 
 ## Termos e direitos de uso
 
